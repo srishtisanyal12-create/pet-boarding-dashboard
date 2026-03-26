@@ -155,7 +155,7 @@ with tab4:
     st.plotly_chart(fig_reg, use_container_width=True)
 
     pred_df = regression["prediction_sample"]
-    fig_pred = px.scatter(pred_df, x="Actual", y="Predicted", trendline="ols", title="Actual vs predicted willingness to pay")
+    fig_pred = px.scatter(pred_df, x="Actual", y="Predicted", title="Actual vs predicted willingness to pay")
     st.plotly_chart(fig_pred, use_container_width=True)
 
     st.info(
