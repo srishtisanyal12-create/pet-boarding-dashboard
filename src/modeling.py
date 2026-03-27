@@ -6,7 +6,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.cluster import KMeans
 from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.metrics import accuracy_score, classification_report, r2_score, mean_squared_error
+from sklearn.metrics import accuracy_score, classification_report, r2_score, mean_squared_error, confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -104,12 +104,20 @@ def run_classification(df: pd.DataFrame) -> dict:
     report = classification_report(y_test, best_pred, output_dict=True)
     report_df = pd.DataFrame(report).transpose().reset_index().rename(columns={"index": "class_or_metric"})
 
+    cm = confusion_matrix(y_test, best_pred)
+    cm_df = pd.DataFrame(
+        cm,
+        index=["Actual: No/Maybe", "Actual: Yes"],
+        columns=["Predicted: No/Maybe", "Predicted: Yes"]
+    )
+
     return {
         "logistic_accuracy": log_acc,
         "rf_accuracy": rf_acc,
         "best_model": best_name,
         "feature_importance": importance_df,
-        "classification_report": report_df
+        "classification_report": report_df,
+        "confusion_matrix": cm_df
     }
 
 def run_regression(df: pd.DataFrame) -> dict:
