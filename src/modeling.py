@@ -6,35 +6,41 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.cluster import KMeans
 from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.metrics import accuracy_score, classification_report, r2_score, mean_squared_error, confusion_matrix
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    r2_score,
+    mean_squared_error,
+    confusion_matrix,
+)
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 CLASS_CATEGORICAL = [
-    "Q1_Age_Group","Q2_Gender","Q3_Employment","Q4_Income","Q5_Pet_Type",
-    "Q5b_Ownership_Duration","Q6_Boarding_Frequency","Q7_Boarding_Reason",
-    "Q11_Urgency","Q15_Care_Preference","Q17_Competitive_Awareness",
-    "Q18_Switching_Threshold","Q20_Payment_Model","Q24_Adoption_Barrier"
+    "Q1_Age_Group", "Q2_Gender", "Q3_Employment", "Q4_Income", "Q5_Pet_Type",
+    "Q5b_Ownership_Duration", "Q6_Boarding_Frequency", "Q7_Boarding_Reason",
+    "Q11_Urgency", "Q15_Care_Preference", "Q17_Competitive_Awareness",
+    "Q18_Switching_Threshold", "Q20_Payment_Model", "Q24_Adoption_Barrier"
 ]
 CLASS_NUMERIC = [
-    "Q9_Monthly_Pet_Spend_USD","Derived_Attachment_Index","Derived_Concern_Index",
-    "Derived_Trust_Index","Derived_TPB_Composite","Derived_Satisfaction_Index"
+    "Q9_Monthly_Pet_Spend_USD", "Derived_Attachment_Index", "Derived_Concern_Index",
+    "Derived_Trust_Index", "Derived_TPB_Composite", "Derived_Satisfaction_Index"
 ]
 
 REG_CATEGORICAL = [
-    "Q1_Age_Group","Q3_Employment","Q4_Income","Q5_Pet_Type",
-    "Q6_Boarding_Frequency","Q11_Urgency","Q15_Care_Preference",
-    "Q20_Payment_Model","Q24_Adoption_Barrier"
+    "Q1_Age_Group", "Q3_Employment", "Q4_Income", "Q5_Pet_Type",
+    "Q6_Boarding_Frequency", "Q11_Urgency", "Q15_Care_Preference",
+    "Q20_Payment_Model", "Q24_Adoption_Barrier"
 ]
 REG_NUMERIC = [
-    "Q9_Monthly_Pet_Spend_USD","Derived_Attachment_Index","Derived_Concern_Index",
-    "Derived_Trust_Index","Derived_TPB_Composite","Derived_Satisfaction_Index"
+    "Q9_Monthly_Pet_Spend_USD", "Derived_Attachment_Index", "Derived_Concern_Index",
+    "Derived_Trust_Index", "Derived_TPB_Composite", "Derived_Satisfaction_Index"
 ]
 
 CLUSTER_FEATURES = [
-    "Derived_Attachment_Index","Derived_Concern_Index","Derived_Trust_Index",
-    "Derived_TPB_Composite","Derived_Satisfaction_Index","Q9_Monthly_Pet_Spend_USD",
+    "Derived_Attachment_Index", "Derived_Concern_Index", "Derived_Trust_Index",
+    "Derived_TPB_Composite", "Derived_Satisfaction_Index", "Q9_Monthly_Pet_Spend_USD",
     "Derived_PSM_WTP_Midpoint"
 ]
 
@@ -53,7 +59,11 @@ def _build_preprocessor(cat_cols, num_cols):
     ])
 
 def _get_feature_names(preprocessor, cat_cols, num_cols):
-    cat_names = list(preprocessor.named_transformers_["cat"].named_steps["onehot"].get_feature_names_out(cat_cols))
+    cat_names = list(
+        preprocessor.named_transformers_["cat"]
+        .named_steps["onehot"]
+        .get_feature_names_out(cat_cols)
+    )
     return cat_names + list(num_cols)
 
 def run_classification(df: pd.DataFrame) -> dict:
@@ -66,10 +76,8 @@ def run_classification(df: pd.DataFrame) -> dict:
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    pre = _build_preprocessor(CLASS_CATEGORICAL, CLASS_NUMERIC)
-
     log_model = Pipeline([
-        ("pre", pre),
+        ("pre", _build_preprocessor(CLASS_CATEGORICAL, CLASS_NUMERIC)),
         ("model", LogisticRegression(max_iter=2000))
     ])
     rf_model = Pipeline([
@@ -98,11 +106,18 @@ def run_classification(df: pd.DataFrame) -> dict:
     else:
         importances = np.abs(best_model.named_steps["model"].coef_[0])
 
-    importance_df = pd.DataFrame({"feature": feature_names, "importance": importances})
-    importance_df = importance_df.sort_values("importance", ascending=False)
+    importance_df = pd.DataFrame({
+        "feature": feature_names,
+        "importance": importances
+    }).sort_values("importance", ascending=False)
 
     report = classification_report(y_test, best_pred, output_dict=True)
-    report_df = pd.DataFrame(report).transpose().reset_index().rename(columns={"index": "class_or_metric"})
+    report_df = (
+        pd.DataFrame(report)
+        .transpose()
+        .reset_index()
+        .rename(columns={"index": "class_or_metric"})
+    )
 
     cm = confusion_matrix(y_test, best_pred)
     cm_df = pd.DataFrame(
@@ -159,10 +174,15 @@ def run_regression(df: pd.DataFrame) -> dict:
     else:
         importances = np.abs(best_model.named_steps["model"].coef_)
 
-    importance_df = pd.DataFrame({"feature": feature_names, "importance": importances})
-    importance_df = importance_df.sort_values("importance", ascending=False)
+    importance_df = pd.DataFrame({
+        "feature": feature_names,
+        "importance": importances
+    }).sort_values("importance", ascending=False)
 
-    sample_df = pd.DataFrame({"Actual": y_test.values, "Predicted": best_pred}).head(150)
+    sample_df = pd.DataFrame({
+        "Actual": y_test.values,
+        "Predicted": best_pred
+    }).head(150)
 
     return {
         "linear_r2": lin_r2,
