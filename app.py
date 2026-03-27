@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from pathlib import Path
 
 from src.data_prep import load_data, get_overview_metrics, get_feature_rankings, get_concern_rankings
@@ -8,6 +9,55 @@ from src.modeling import run_classification, run_regression, run_clustering
 from src.association_rules import run_association_rules
 
 st.set_page_config(page_title="Premium Pet Boarding Analytics Dashboard", page_icon="🐾", layout="wide")
+
+st.markdown("""
+<style>
+    .block-container {
+        padding-top: 1.4rem;
+        padding-bottom: 2rem;
+        max-width: 1240px;
+    }
+    .stMetric {
+        background: rgba(255,255,255,0.03);
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+    div[data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    div[data-baseweb="tab"] {
+        font-size: 15px;
+        font-weight: 600;
+        padding: 10px 15px;
+        border-radius: 12px 12px 0 0;
+    }
+    .insight-box {
+        background: linear-gradient(90deg, rgba(16,185,129,0.18), rgba(5,150,105,0.07));
+        border-left: 5px solid #10b981;
+        padding: 16px;
+        border-radius: 12px;
+        margin-top: 12px;
+        margin-bottom: 16px;
+    }
+    .diag-box {
+        background: linear-gradient(90deg, rgba(59,130,246,0.18), rgba(37,99,235,0.07));
+        border-left: 5px solid #60a5fa;
+        padding: 16px;
+        border-radius: 12px;
+        margin-top: 12px;
+        margin-bottom: 16px;
+    }
+    .warn-box {
+        background: linear-gradient(90deg, rgba(245,158,11,0.18), rgba(217,119,6,0.07));
+        border-left: 5px solid #f59e0b;
+        padding: 16px;
+        border-radius: 12px;
+        margin-top: 12px;
+        margin-bottom: 16px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 DATA_PATH = Path(__file__).parent / "data" / "pet_boarding_cleaned.csv"
 
@@ -28,26 +78,36 @@ def get_clustering_results(df):
     return run_clustering(df)
 
 @st.cache_data
-def get_assoc_results(df):
-    return run_association_rules(df)
+def get_assoc_results(df, min_support, min_confidence, min_lift):
+    return run_association_rules(df, min_support=min_support, min_confidence=min_confidence, min_lift=min_lift)
 
 df = get_data()
 
 st.title("🐾 Premium Pet Boarding App Analytics Dashboard")
-st.caption("Business problem: Identify likely adopters, expected willingness to pay, high-value customer segments, and feature bundles for a premium pet boarding app.")
+st.markdown("""
+<div style='background: linear-gradient(90deg, #1d4ed8, #0f172a); padding: 20px; border-radius: 16px; margin-bottom: 18px;'>
+    <h3 style='color: white; margin: 0;'>Trust-led premium pet care, validated through data</h3>
+    <p style='color: #dbeafe; margin-top: 8px; font-size: 16px;'>
+        This dashboard evaluates market demand, adoption drivers, willingness to pay, customer segments, and feature bundles for a premium pet boarding app.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tabs = st.tabs([
     "Overview",
     "Descriptive Analytics",
-    "Classification",
-    "Regression",
-    "Clustering",
-    "Association Rules",
+    "Diagnostic Analytics",
+    "Adoption Prediction",
+    "Pricing Analysis",
+    "Customer Segments",
+    "Feature Associations",
     "Recommendations"
 ])
 
-with tab1:
+# ---------------- OVERVIEW ----------------
+with tabs[0]:
     st.subheader("Project overview")
+
     col1, col2, col3, col4 = st.columns(4)
     metrics = get_overview_metrics(df)
     col1.metric("Respondents", f"{metrics['respondents']:,}")
@@ -56,70 +116,193 @@ with tab1:
     col4.metric("Avg willingness to pay", f"${metrics['avg_wtp']:.0f}")
 
     st.markdown("""
-    **Objective**
-    - Predict which pet owners are most likely to adopt the app
-    - Estimate how much they are willing to pay
-    - Segment the market into actionable personas
-    - Identify which features and concerns occur together
+    **Business problem**  
+    The business wants to identify which pet owners are most likely to adopt a premium pet boarding app, what features they value most, how much they are willing to pay, and how the market can be segmented for targeted offers.
 
-    **Dataset**
-    - 2,000 synthetic survey responses
-    - Cleaned working dataset with 76 analysis-ready columns
-    - Includes demographics, pet-care behaviour, feature preferences, trust/concern indices, and willingness-to-pay variables
+    **What this dashboard helps answer**
+    - Who is most likely to adopt the app?
+    - What trust and safety concerns are strongest?
+    - Which features deserve launch priority?
+    - How much are users likely to pay?
+    - What customer segments should be targeted differently?
     """)
-
-    st.info(
-        "Use the tabs to explore descriptive patterns, model outputs, customer segments, and feature bundles. "
-        "This dashboard is designed for business storytelling rather than technical depth alone."
-    )
-
-with tab2:
-    st.subheader("Descriptive analytics")
-
-    col1, col2 = st.columns(2)
-    adoption_counts = df["Q25_Adoption_Intent"].value_counts().reset_index()
-    adoption_counts.columns = ["Adoption_Intent", "Count"]
-    fig1 = px.bar(adoption_counts, x="Adoption_Intent", y="Count", title="Adoption intent distribution")
-    col1.plotly_chart(fig1, use_container_width=True)
-
-    fig2 = px.histogram(df, x="Derived_PSM_WTP_Midpoint", nbins=30, title="Willingness to pay distribution")
-    col2.plotly_chart(fig2, use_container_width=True)
-
-    col3, col4 = st.columns(2)
-    age_counts = df["Q1_Age_Group"].value_counts().reset_index()
-    age_counts.columns = ["Age_Group", "Count"]
-    fig3 = px.bar(age_counts, x="Age_Group", y="Count", title="Age group mix")
-    col3.plotly_chart(fig3, use_container_width=True)
-
-    pet_counts = df["Q5_Pet_Type"].value_counts().reset_index()
-    pet_counts.columns = ["Pet_Type", "Count"]
-    fig4 = px.pie(pet_counts, names="Pet_Type", values="Count", title="Pet type mix")
-    col4.plotly_chart(fig4, use_container_width=True)
-
-    col5, col6 = st.columns(2)
-    feature_df = get_feature_rankings(df)
-    fig5 = px.bar(feature_df, x="Average_AddOn_Budget_USD", y="Feature", orientation="h", title="Most valued premium features")
-    fig5.update_layout(yaxis={'categoryorder':'total ascending'})
-    col5.plotly_chart(fig5, use_container_width=True)
-
-    concern_df = get_concern_rankings(df)
-    fig6 = px.bar(concern_df, x="Average_Concern_Score", y="Concern", orientation="h", title="Top customer concerns")
-    fig6.update_layout(yaxis={'categoryorder':'total ascending'})
-    col6.plotly_chart(fig6, use_container_width=True)
-
-    income_wtp = df.groupby("Q4_Income", as_index=False)["Derived_PSM_WTP_Midpoint"].mean()
-    fig7 = px.bar(income_wtp, x="Q4_Income", y="Derived_PSM_WTP_Midpoint", title="Average willingness to pay by income")
-    st.plotly_chart(fig7, use_container_width=True)
 
     st.markdown("""
-    **Quick read**
-    - Adoption intent reveals the immediate commercial opportunity.
-    - Willingness to pay helps frame pricing and package design.
-    - Concern and feature charts tell the product team where trust-building should focus.
-    """)
+    <div class='insight-box'>
+    <b>Executive takeaway:</b> The strongest opportunity is not just easier booking. It is reduced anxiety through visibility, trust, and premium reassurance.
+    </div>
+    """, unsafe_allow_html=True)
 
-with tab3:
-    st.subheader("Classification: who is likely to adopt?")
+# ---------------- DESCRIPTIVE ----------------
+with tabs[1]:
+    st.subheader("Descriptive analytics")
+    dtab1, dtab2, dtab3 = st.tabs(["Demographics", "Case-specific charts", "Correlations"])
+
+    with dtab1:
+        col1, col2 = st.columns(2)
+
+        age_counts = df["Q1_Age_Group"].value_counts().reset_index()
+        age_counts.columns = ["Age_Group", "Count"]
+        fig_age = px.bar(age_counts, x="Age_Group", y="Count", title="Which age groups dominate the potential market?")
+        col1.plotly_chart(fig_age, use_container_width=True)
+        col1.caption("Business takeaway: the sample is concentrated in active working-age groups, making the concept commercially relevant for digitally comfortable and financially active users.")
+
+        pet_counts = df["Q5_Pet_Type"].value_counts().reset_index()
+        pet_counts.columns = ["Pet_Type", "Count"]
+        fig_pet = px.pie(pet_counts, names="Pet_Type", values="Count", title="Which pet-owner categories matter most at launch?")
+        col2.plotly_chart(fig_pet, use_container_width=True)
+        col2.caption("Business takeaway: dogs and cats dominate the addressable market, so launch positioning should prioritise these segments first.")
+
+        income_counts = df["Q4_Income"].value_counts().reset_index()
+        income_counts.columns = ["Income", "Count"]
+        fig_income = px.bar(income_counts, x="Income", y="Count", title="How is the sample distributed by income?")
+        st.plotly_chart(fig_income, use_container_width=True)
+
+    with dtab2:
+        col1, col2 = st.columns(2)
+
+        adoption_counts = df["Q25_Adoption_Intent"].value_counts().reset_index()
+        adoption_counts.columns = ["Adoption_Intent", "Count"]
+        fig1 = px.bar(adoption_counts, x="Adoption_Intent", y="Count", title="How strong is initial adoption intent?")
+        col1.plotly_chart(fig1, use_container_width=True)
+        col1.caption("Business takeaway: the market shows meaningful immediate interest, with 'Yes' and 'Maybe' together creating a sizable launch opportunity.")
+
+        fig2 = px.histogram(df, x="Derived_PSM_WTP_Midpoint", nbins=30, title="How much are users willing to pay?")
+        col2.plotly_chart(fig2, use_container_width=True)
+        col2.caption("Business takeaway: price tolerance clusters in the middle range, supporting premium positioning with disciplined package design.")
+
+        col3, col4 = st.columns(2)
+
+        feature_df = get_feature_rankings(df)
+        fig5 = px.bar(feature_df, x="Average_AddOn_Budget_USD", y="Feature", orientation="h", title="Which premium features matter most?")
+        fig5.update_layout(yaxis={'categoryorder':'total ascending'})
+        col3.plotly_chart(fig5, use_container_width=True)
+        col3.caption("Business takeaway: users value transparency and control features more than decorative extras.")
+
+        concern_df = get_concern_rankings(df)
+        fig6 = px.bar(concern_df, x="Average_Concern_Score", y="Concern", orientation="h", title="What anxieties must the product solve first?")
+        fig6.update_layout(yaxis={'categoryorder':'total ascending'})
+        col4.plotly_chart(fig6, use_container_width=True)
+        col4.caption("Business takeaway: trust, safety, updates, and emergency handling are the emotional core of the problem.")
+
+        income_wtp = df.groupby("Q4_Income", as_index=False)["Derived_PSM_WTP_Midpoint"].mean()
+        fig7 = px.bar(income_wtp, x="Q4_Income", y="Derived_PSM_WTP_Midpoint", title="How does willingness to pay change by income?")
+        st.plotly_chart(fig7, use_container_width=True)
+
+    with dtab3:
+        corr_cols = [
+            "Q9_Monthly_Pet_Spend_USD",
+            "Derived_Attachment_Index",
+            "Derived_Concern_Index",
+            "Derived_Trust_Index",
+            "Derived_TPB_Composite",
+            "Derived_Satisfaction_Index",
+            "Derived_PSM_WTP_Midpoint"
+        ]
+        corr_df = df[corr_cols].corr().round(2)
+
+        fig_corr = go.Figure(data=go.Heatmap(
+            z=corr_df.values,
+            x=corr_df.columns,
+            y=corr_df.index,
+            text=corr_df.values,
+            texttemplate="%{text}",
+            colorscale="Blues"
+        ))
+        fig_corr.update_layout(title="How do the key numeric variables relate to each other?")
+        st.plotly_chart(fig_corr, use_container_width=True)
+        st.caption("Business takeaway: willingness to pay is not isolated — it moves alongside pet spend, attachment, trust, and concern.")
+
+# ---------------- DIAGNOSTIC ----------------
+with tabs[2]:
+    st.subheader("Diagnostic analytics: why are these patterns happening?")
+
+    st.markdown("""
+    <div class='diag-box'>
+    Descriptive analytics shows <b>what</b> is happening. Diagnostic analytics helps explain <b>why</b> it is happening.
+    </div>
+    """, unsafe_allow_html=True)
+
+    diag1 = (
+        df.groupby("Q25_Adoption_Intent")[[
+            "Derived_Trust_Index",
+            "Derived_Concern_Index",
+            "Derived_Attachment_Index"
+        ]]
+        .mean()
+        .reset_index()
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig_diag1 = px.bar(
+            diag1,
+            x="Q25_Adoption_Intent",
+            y=["Derived_Trust_Index", "Derived_Concern_Index", "Derived_Attachment_Index"],
+            barmode="group",
+            title="Why does adoption differ? Trust, concern, and attachment by intent"
+        )
+        st.plotly_chart(fig_diag1, use_container_width=True)
+        st.caption("Business takeaway: likely adopters tend to combine stronger concern, stronger attachment, and stronger trust orientation.")
+
+    adopt_income = (
+        df.groupby("Q4_Income")["Q25_Adoption_Intent"]
+        .apply(lambda x: (x == "Yes").mean() * 100)
+        .reset_index(name="Yes_Adoption_Rate")
+    )
+
+    with col2:
+        fig_diag2 = px.bar(
+            adopt_income,
+            x="Q4_Income",
+            y="Yes_Adoption_Rate",
+            title="Why do some groups adopt more? Yes-adoption rate by income"
+        )
+        st.plotly_chart(fig_diag2, use_container_width=True)
+        st.caption("Business takeaway: affordability matters, but adoption is not confined to a single high-income niche.")
+
+    col3, col4 = st.columns(2)
+
+    adopt_freq = (
+        df.groupby("Q6_Boarding_Frequency")["Q25_Adoption_Intent"]
+        .apply(lambda x: (x == "Yes").mean() * 100)
+        .reset_index(name="Yes_Adoption_Rate")
+    )
+    with col3:
+        fig_diag3 = px.bar(
+            adopt_freq,
+            x="Q6_Boarding_Frequency",
+            y="Yes_Adoption_Rate",
+            title="Why does urgency matter? Adoption rate by boarding frequency"
+        )
+        st.plotly_chart(fig_diag3, use_container_width=True)
+        st.caption("Business takeaway: users with more frequent boarding needs represent stronger immediate commercial potential.")
+
+    wtp_diag = (
+        df.groupby("Q25_Adoption_Intent")["Derived_PSM_WTP_Midpoint"]
+        .mean()
+        .reset_index()
+    )
+    with col4:
+        fig_diag4 = px.bar(
+            wtp_diag,
+            x="Q25_Adoption_Intent",
+            y="Derived_PSM_WTP_Midpoint",
+            title="Why is monetization viable? Willingness to pay by adoption intent"
+        )
+        st.plotly_chart(fig_diag4, use_container_width=True)
+        st.caption("Business takeaway: users who are more likely to adopt also tend to show stronger willingness to pay.")
+
+    st.markdown("""
+    <div class='insight-box'>
+    <b>Diagnostic insight:</b> The strongest explanation for adoption is not convenience alone. It is the combination of emotional attachment, worry about care quality, and desire for visible reassurance.
+    </div>
+    """, unsafe_allow_html=True)
+
+# ---------------- CLASSIFICATION ----------------
+with tabs[3]:
+    st.subheader("Adoption prediction: who is most likely to adopt?")
     classification = get_classification_results(df)
 
     metric_cols = st.columns(3)
@@ -127,52 +310,79 @@ with tab3:
     metric_cols[1].metric("Random forest accuracy", f"{classification['rf_accuracy']:.3f}")
     metric_cols[2].metric("Selected model", classification["best_model"])
 
-    st.markdown("**Top drivers of adoption**")
-    importances = classification["feature_importance"].head(12)
-    fig_imp = px.bar(importances, x="importance", y="feature", orientation="h", title="Feature importance")
-    fig_imp.update_layout(yaxis={'categoryorder':'total ascending'})
-    st.plotly_chart(fig_imp, use_container_width=True)
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.markdown("**Top drivers of adoption**")
+        importances = classification["feature_importance"].head(12)
+        fig_imp = px.bar(importances, x="importance", y="feature", orientation="h", title="Which variables drive likely adoption?")
+        fig_imp.update_layout(yaxis={'categoryorder':'total ascending'})
+        st.plotly_chart(fig_imp, use_container_width=True)
+
+    with c2:
+        st.markdown("**Confusion matrix**")
+        cm = classification["confusion_matrix"]
+        fig_cm = go.Figure(data=go.Heatmap(
+            z=cm.values,
+            x=cm.columns,
+            y=cm.index,
+            text=cm.values,
+            texttemplate="%{text}",
+            colorscale="Teal"
+        ))
+        fig_cm.update_layout(title="Where is the model right and where does it get confused?")
+        st.plotly_chart(fig_cm, use_container_width=True)
 
     st.dataframe(classification["classification_report"], use_container_width=True)
-    st.success(
-        "Business interpretation: adoption is driven most strongly by urgency, trust, concern, and positive attitudes "
-        "towards premium care. This means the launch should target owners with real near-term boarding needs and a strong need for transparency."
-    )
 
-with tab4:
-    st.subheader("Regression: what drives willingness to pay?")
+    st.markdown("""
+    <div class='insight-box'>
+    <b>Business takeaway:</b> adoption is strongest among users with stronger concern, stronger trust orientation, higher pet spend, and more positive attitudes toward premium monitored care.
+    </div>
+    """, unsafe_allow_html=True)
+
+# ---------------- REGRESSION ----------------
+with tabs[4]:
+    st.subheader("Pricing analysis: what drives willingness to pay?")
     regression = get_regression_results(df)
 
-    metric_cols = st.columns(3)
+    metric_cols = st.columns(4)
     metric_cols[0].metric("Linear Regression R²", f"{regression['linear_r2']:.3f}")
     metric_cols[1].metric("Random Forest R²", f"{regression['rf_r2']:.3f}")
     metric_cols[2].metric("Best model", regression["best_model"])
+    metric_cols[3].metric("Best RMSE", f"{regression['rmse_best']:.2f}")
 
-    st.markdown("**Top drivers of willingness to pay**")
-    reg_imp = regression["feature_importance"].head(12)
-    fig_reg = px.bar(reg_imp, x="importance", y="feature", orientation="h", title="Drivers of willingness to pay")
-    fig_reg.update_layout(yaxis={'categoryorder':'total ascending'})
-    st.plotly_chart(fig_reg, use_container_width=True)
+    col1, col2 = st.columns(2)
 
-    pred_df = regression["prediction_sample"]
-    fig_pred = px.scatter(pred_df, x="Actual", y="Predicted", title="Actual vs predicted willingness to pay")
-    st.plotly_chart(fig_pred, use_container_width=True)
+    with col1:
+        reg_imp = regression["feature_importance"].head(12)
+        fig_reg = px.bar(reg_imp, x="importance", y="feature", orientation="h", title="What most strongly influences willingness to pay?")
+        fig_reg.update_layout(yaxis={'categoryorder':'total ascending'})
+        st.plotly_chart(fig_reg, use_container_width=True)
 
-    st.info(
-        "Higher willingness to pay typically comes from stronger trust, stronger attachment to the pet, "
-        "higher current pet spending, and higher-value income bands."
-    )
+    with col2:
+        pred_df = regression["prediction_sample"]
+        fig_pred = px.scatter(pred_df, x="Actual", y="Predicted", title="How close are predicted and actual willingness to pay values?")
+        st.plotly_chart(fig_pred, use_container_width=True)
 
-with tab5:
-    st.subheader("Clustering: market segments")
+    st.markdown("""
+    <div class='insight-box'>
+    <b>Business takeaway:</b> willingness to pay is shaped not only by income, but by emotional attachment, current pet spending, concern intensity, and the perceived value of reassurance features.
+    </div>
+    """, unsafe_allow_html=True)
+
+# ---------------- CLUSTERING ----------------
+with tabs[5]:
+    st.subheader("Customer segments: how does the market break apart?")
     clustering = get_clustering_results(df)
 
     st.metric("Chosen number of clusters", clustering["n_clusters"])
+
     fig_cluster = px.scatter(
         clustering["cluster_plot_df"],
         x="PC1", y="PC2", color="Cluster",
         hover_data=["Respondent_ID"],
-        title="Cluster map (PCA projection)"
+        title="How do respondents cluster into different customer personas?"
     )
     st.plotly_chart(fig_cluster, use_container_width=True)
 
@@ -180,52 +390,87 @@ with tab5:
     st.dataframe(clustering["cluster_summary"], use_container_width=True)
 
     st.markdown("""
-    **How to use this**
-    - Target premium, trust-sensitive clusters with live updates, CCTV, and emergency coordination.
-    - Position budget-sensitive clusters around starter plans or lighter feature bundles.
-    - Use segment-level messaging instead of one generic campaign for all pet owners.
-    """)
+    <div class='insight-box'>
+    <b>Business takeaway:</b> the market is not one-size-fits-all. Different groups show different combinations of attachment, concern, trust, spend, and willingness to pay, which supports segment-specific packaging.
+    </div>
+    """, unsafe_allow_html=True)
 
-with tab6:
-    st.subheader("Association rules: what preferences occur together?")
-    assoc = get_assoc_results(df)
+# ---------------- ASSOCIATION RULES ----------------
+with tabs[6]:
+    st.subheader("Feature associations: which needs naturally bundle together?")
+
+    st.markdown("""
+    <div class='warn-box'>
+    You can change the rule strictness below. Higher values make the rules fewer but stronger.
+    </div>
+    """, unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns(3)
+    min_support = c1.slider("Minimum support", 0.01, 0.30, 0.08, 0.01)
+    min_confidence = c2.slider("Minimum confidence", 0.05, 0.90, 0.25, 0.05)
+    min_lift = c3.slider("Minimum lift", 0.50, 3.00, 1.00, 0.10)
+
+    assoc = get_assoc_results(df, min_support, min_confidence, min_lift)
 
     st.metric("Strong rules found", len(assoc["rules"]))
+
     if len(assoc["rules"]) == 0:
-        st.warning("No strong rules were found with the current thresholds.")
+        st.warning("No strong rules were found with the current thresholds. Try lowering the sliders slightly.")
     else:
-        st.dataframe(assoc["rules"].head(15), use_container_width=True)
+        st.dataframe(assoc["rules"].head(20), use_container_width=True)
 
-        if len(assoc["rules"]) > 0:
-            top_rule = assoc["rules"].iloc[0]
-            st.success(
-                f"Example insight: users who show {top_rule['antecedents']} also tend to show {top_rule['consequents']}. "
-                "This helps bundle features and write more relevant campaign messaging."
-            )
+        top_rule = assoc["rules"].iloc[0]
+        st.markdown(f"""
+        <div class='insight-box'>
+        <b>Top rule insight:</b> users showing <b>{top_rule['antecedents']}</b> also tend to show <b>{top_rule['consequents']}</b>.
+        This is useful for feature bundling, campaign copy, and premium package design.
+        </div>
+        """, unsafe_allow_html=True)
 
-with tab7:
-    st.subheader("Recommendations")
+# ---------------- RECOMMENDATIONS ----------------
+with tabs[7]:
+    st.subheader("Strategic recommendations")
+
+    r1, r2 = st.columns(2)
+
+    with r1:
+        st.markdown("""
+        ### 1. Launch around reassurance, not convenience
+        - Lead with live updates, CCTV, emergency coordination, and verified caretaker profiles
+        - Position the product as a trust-building platform, not just a booking tool
+
+        ### 2. Prioritise high-intent segments first
+        - Target urgent and trust-sensitive owners
+        - Focus on users with stronger pet attachment and meaningful current pet spend
+
+        ### 3. Use tiered pricing
+        - Full premium plan for high-trust / high-value users
+        - Modular plan for mid-premium users
+        - Starter plan for price-sensitive segments
+        """)
+
+    with r2:
+        st.markdown("""
+        ### 4. Bundle features based on actual co-occurrence
+        - Package updates, CCTV, health logs, and emergency support together
+        - Avoid treating these as isolated add-ons
+
+        ### 5. Build segment-specific messaging
+        - Premium cluster: peace of mind and concierge-like care
+        - Mid segment: reliable monitored care with selective add-ons
+        - Budget segment: safe, simpler entry-level plan
+
+        ### 6. Use the dashboard as a decision tool
+        - Descriptive = what is happening
+        - Diagnostic = why it is happening
+        - Prediction = who to target
+        - Pricing = how to monetise
+        - Clustering = how to segment
+        - Association rules = how to bundle
+        """)
+
     st.markdown("""
-    ### Recommended go-to-market actions
-
-    **1. Target urgent, trust-sensitive owners first**
-    - Prioritize users with confirmed or likely near-term need.
-    - Use trust-building messages around safety, emergency support, and transparency.
-
-    **2. Lead with a “peace of mind” feature bundle**
-    - Package live updates, CCTV access, health logs, and emergency coordination together.
-    - These features align with the strongest concern patterns.
-
-    **3. Use segment-based offers**
-    - Premium cluster: high-trust, high-attachment users → full-service premium plan
-    - Mid-market cluster: selective add-ons → modular package
-    - Price-conscious cluster: lower-entry starter plan
-
-    **4. Price with evidence, not guesswork**
-    - Use willingness-to-pay outputs to define plan tiers.
-    - Offer optional add-ons rather than one high all-inclusive price.
-
-    **5. Build launch messaging around reassurance**
-    - The data suggests adoption is not just about convenience.
-    - It is about reducing anxiety when owners leave pets in someone else’s care.
-    """)
+    <div class='insight-box'>
+    <b>Final business insight:</b> this idea wins when it reduces the emotional risk of leaving a pet behind. The strongest commercial lever is trust-backed transparency.
+    </div>
+    """, unsafe_allow_html=True)
